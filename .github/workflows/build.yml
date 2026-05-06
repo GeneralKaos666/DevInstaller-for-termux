@@ -61,6 +61,67 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
 
+  build-termux-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Termux .deb package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 - <<'PY'
+          import tomllib
+
+          with open("pyproject.toml", "rb") as fh:
+              print(tomllib.load(fh)["project"]["version"])
+          PY
+          )"
+
+          PACKAGE_NAME="devinstaller"
+          PREFIX="/data/data/com.termux/files/usr"
+          STAGING_ROOT="$RUNNER_TEMP/${PACKAGE_NAME}-termux"
+          PACKAGE_ROOT="$STAGING_ROOT/${PACKAGE_NAME}"
+          INSTALL_ROOT="$PACKAGE_ROOT${PREFIX}"
+          LIB_ROOT="$INSTALL_ROOT/lib/${PACKAGE_NAME}"
+
+          rm -rf "$STAGING_ROOT"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN" "$INSTALL_ROOT/bin" "$LIB_ROOT" dist
+
+          cp -r src/udm "$LIB_ROOT/"
+          cp tools.json "$LIB_ROOT/tools.json"
+
+          cat >"$INSTALL_ROOT/bin/devinstaller" <<EOF
+          #!/data/data/com.termux/files/usr/bin/sh
+          export PYTHONPATH="$PREFIX/lib/$PACKAGE_NAME\${PYTHONPATH:+:\$PYTHONPATH}"
+          exec $PREFIX/bin/python -m udm "\$@"
+          EOF
+          chmod 755 "$INSTALL_ROOT/bin/devinstaller"
+
+          cat >"$PACKAGE_ROOT/DEBIAN/control" <<EOF
+          Package: $PACKAGE_NAME
+          Version: $VERSION
+          Architecture: all
+          Maintainer: GeneralKaos666 <GeneralKaos666@users.noreply.github.com>
+          Installed-Size: $(du -sk "$INSTALL_ROOT" | cut -f1)
+          Depends: python
+          Homepage: https://github.com/${{ github.repository }}
+          Section: utils
+          Priority: optional
+          Description: DevInstaller for Termux
+           Cross-platform developer tool installer with a Termux-friendly CLI.
+          EOF
+
+          dpkg-deb --root-owner-group --build \
+            "$PACKAGE_ROOT" \
+            "dist/${PACKAGE_NAME}_${VERSION}_all.deb"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: termux-deb
+          path: dist/*.deb
+          if-no-files-found: error
+
   build-macos:
     runs-on: macos-latest
     steps:
@@ -84,7 +145,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.event.head_commit.message, 'release:')
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-termux-deb, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -111,5 +172,6 @@ jobs:
           files: |
             artifacts/windows-exe/*
             artifacts/linux-appimage/*
+            artifacts/termux-deb/*
             artifacts/macos-dmg/*
           generate_release_notes: true
