@@ -1,9 +1,10 @@
 """Admin / privilege helpers."""
 
 import os
+import shutil
 import sys
 
-from udm.platform.detect import is_windows
+from udm.platform.detect import is_termux, is_windows
 
 
 def is_admin() -> bool:
@@ -28,3 +29,11 @@ def request_admin():
             None, "runas", sys.executable, " ".join(sys.argv), None, 1
         )
         sys.exit(0)
+    if is_termux():
+        raise RuntimeError("Privilege escalation is not supported on Termux.")
+    if os.geteuid() == 0:
+        return
+    for launcher in ("pkexec", "sudo"):
+        if shutil.which(launcher):
+            os.execvp(launcher, [launcher, sys.executable, *sys.argv])
+    raise RuntimeError("No supported privilege escalation helper was found.")

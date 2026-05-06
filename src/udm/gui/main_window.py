@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(build_stylesheet())
 
         self._installing = False
+        self._install_thread: threading.Thread | None = None
         self._signals = WorkerSignals()
         self._signals.progress.connect(self._on_progress)
         self._signals.log_message.connect(self._on_log)
@@ -198,16 +199,16 @@ class MainWindow(QMainWindow):
         self.log_panel.append_log(f"Selected: {names}")
 
         def worker():
+            results: dict = {}
             try:
                 results = install_selected(tools)
-            except Exception as ex:
+            except Exception:
                 logger.exception("Unhandled error during installation")
-                results = {}
             finally:
-                self._installing = False
                 self._signals.finished.emit(results)
 
-        threading.Thread(target=worker, daemon=True).start()
+        self._install_thread = threading.Thread(target=worker, daemon=False)
+        self._install_thread.start()
 
     @Slot(str, str, int)
     def _on_progress(self, tool: str, status: str, pct: int):
@@ -220,6 +221,8 @@ class MainWindow(QMainWindow):
 
     @Slot(dict)
     def _on_install_finished(self, results: dict):
+        self._installing = False
+        self._install_thread = None
         self.status_bar.set_progress(100)
 
         installed = sum(1 for v in results.values() if v == "installed")
@@ -244,13 +247,11 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         if self._installing:
-            reply = QMessageBox.question(
+            QMessageBox.information(
                 self,
-                "Confirm",
-                "Installation in progress. Force exit?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                "Installation in progress",
+                "Please wait for the current installation to finish before closing.",
             )
-            if reply == QMessageBox.StandardButton.No:
-                event.ignore()
-                return
+            event.ignore()
+            return
         event.accept()

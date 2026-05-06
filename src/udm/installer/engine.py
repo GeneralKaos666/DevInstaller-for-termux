@@ -1,6 +1,7 @@
 """Core installation engine — detect, install, and configure PATH."""
 
 import platform
+import shlex
 
 from udm.installer.callbacks import log
 from udm.installer.prerequisites import ensure_apt_updated, ensure_homebrew
@@ -8,16 +9,74 @@ from udm.platform import (
     add_to_path,
     is_linux,
     is_mac,
+    is_termux,
     is_windows,
     resolve_env_path,
     run_command,
 )
+
+_TERMUX_PACKAGE_MAP: dict[str, list[str]] = {
+    "build-essential": ["clang", "make"],
+    "g++": ["clang"],
+    "gcc": ["clang"],
+    "golang-go": ["golang"],
+    "ninja-build": ["ninja"],
+    "openjdk-17-jdk": ["openjdk-17"],
+    "openjdk-21-jdk": ["openjdk-17"],
+    "python3": ["python"],
+    "python3-pip": ["python"],
+    "python3-venv": [],
+    "python3.11": ["python"],
+    "python3.11-venv": [],
+    "ruby-full": ["ruby"],
+}
+
+
+def _normalize_termux_command(cmd: str) -> str:
+    """Translate common desktop Linux commands into Termux-friendly variants."""
+    stripped = cmd.strip()
+    if not stripped:
+        return ""
+    if stripped.startswith("sudo "):
+        stripped = stripped[5:]
+    stripped = stripped.replace("| sudo ", "| ")
+    stripped = stripped.replace("&& sudo ", "&& ")
+    stripped = stripped.replace("; sudo ", "; ")
+    if stripped == "apt-get update -y" or stripped == "apt update -y":
+        return "pkg update -y"
+
+    try:
+        parts = shlex.split(stripped)
+    except ValueError:
+        return stripped
+
+    if len(parts) >= 2 and parts[0] in {"apt", "apt-get"} and parts[1] == "install":
+        packages: list[str] = []
+        seen: set[str] = set()
+        for token in parts[2:]:
+            if token.startswith("-"):
+                continue
+            mapped = _TERMUX_PACKAGE_MAP.get(token, [token])
+            for package in mapped:
+                if package and package not in seen:
+                    seen.add(package)
+                    packages.append(package)
+        if not packages:
+            return ""
+        return "pkg install -y " + " ".join(packages)
+
+    return stripped
 
 
 def _get_install_cmd(tool: dict) -> str:
     """Return the install command for the current platform, or '' if none."""
     if is_windows():
         return tool.get("install_command_windows", "")
+    elif is_termux():
+        cmd = tool.get("install_command_termux", "")
+        if cmd:
+            return cmd
+        return _normalize_termux_command(tool.get("install_command_linux", ""))
     elif is_linux():
         return tool.get("install_command_linux", "")
     elif is_mac():
@@ -52,7 +111,9 @@ def install_tool(tool: dict) -> bool:
 
     if is_mac():
         ensure_homebrew()
-    if is_linux() and cmd.startswith("sudo apt"):
+    if is_linux() and (
+        cmd.startswith("sudo apt") or (is_termux() and cmd.startswith("pkg "))
+    ):
         ensure_apt_updated()
 
     log(f"  Running: {cmd}")
@@ -82,11 +143,17 @@ def setup_path(tool: dict) -> bool:
     key = (
         "path_dirs_windows"
         if is_windows()
+        else "path_dirs_termux"
+        if is_termux()
         else "path_dirs_linux"
         if is_linux()
         else "path_dirs_mac"
     )
-    dirs = tool.get(key, [])
+    dirs = tool.get(key)
+    if dirs is None and is_termux():
+        dirs = tool.get("path_dirs_linux", [])
+    if dirs is None:
+        dirs = []
     if not dirs:
         return True
 

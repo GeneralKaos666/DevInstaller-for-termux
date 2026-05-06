@@ -12,7 +12,7 @@ A professional, cross-platform desktop application that lets developers **search
 | **Instant Search**  | Type to filter the tool list in real time                          |
 | **Sidebar Nav**     | Browse tools by category with icon navigation                      |
 | **Smart Install**   | Install button stays disabled until ≥1 item is selected            |
-| **Cross-Platform**  | Windows (winget), Linux (apt), macOS (Homebrew)                    |
+| **Cross-Platform**  | Windows (winget), Linux (apt), macOS (Homebrew), Termux (CLI mode) |
 | **Auto Detection**  | Skips tools that are already installed                             |
 | **PATH Management** | Automatically configures environment variables                     |
 | **Live Progress**   | Gradient progress bar, status label, and colour-coded terminal log  |
@@ -30,6 +30,7 @@ A professional, cross-platform desktop application that lets developers **search
 - **Windows**: `winget` (ships with Windows 10 / 11)
 - **Linux**: `apt` (Debian / Ubuntu)
 - **macOS**: `brew` (Homebrew) — auto-installed if missing
+- **Termux**: terminal session; the app automatically falls back to CLI mode when no GUI display is available
 
 ### Install & Run
 
@@ -42,6 +43,31 @@ uv sync
 
 # Run the application
 uv run python -m udm
+```
+
+On Termux, prefer the packaged `uv` binary instead of the upstream install script:
+
+```bash
+pkg install uv
+uv sync
+uv run python -m udm --list
+```
+
+For the full GUI inside Termux-X11, install the Termux Qt bindings first:
+
+```bash
+pkg install pyside6
+export DISPLAY=:0
+uv sync
+uv run python -m udm
+```
+
+On Termux without Termux-X11, or in any other headless environment, DevInstaller automatically switches to CLI mode:
+
+```bash
+uv run python -m udm --list
+uv run python -m udm --search python --list
+uv run python -m udm --install git python
 ```
 
 For admin / elevated mode (recommended on Windows):
@@ -71,6 +97,8 @@ bash scripts/build_appimage.sh            # Linux
 bash scripts/build_dmg.sh                 # macOS
 ```
 
+Desktop packaging dependencies are skipped on Android/Termux because those build targets are not supported there.
+
 Output appears in the `dist/` folder.
 
 ---
@@ -90,6 +118,7 @@ Edit `tools.json` to add, remove, or modify tools. Each entry:
   "install_command_windows": "winget install --id Python.Python.3.12 ...",
   "install_command_linux": "sudo apt-get install -y python3",
   "install_command_mac": "brew install python",
+  "install_command_termux": "pkg install -y python",
   "path_dirs_windows": ["%LOCALAPPDATA%\\Programs\\Python\\Python312"],
   "path_required": true
 }

@@ -16,19 +16,19 @@ name = "devinstaller"
 version = "1.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "pyside6" },
+    { name = "pyside6", marker = "sys_platform != 'android'" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "pyinstaller" },
+    { name = "pyinstaller", marker = "sys_platform != 'android'" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyside6", specifier = ">=6.6.0" }]
+requires-dist = [{ name = "pyside6", marker = "sys_platform != 'android'", specifier = ">=6.6.0" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pyinstaller", specifier = ">=6.0.0" }]
+dev = [{ name = "pyinstaller", marker = "sys_platform != 'android'", specifier = ">=6.0.0" }]
 
 [[package]]
 name = "macholib"
