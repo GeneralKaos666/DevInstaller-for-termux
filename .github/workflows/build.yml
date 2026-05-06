@@ -26,7 +26,7 @@ jobs:
       - name: Build Windows executable
         run: uv run python scripts/build_exe.py
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-exe
           path: dist/*.exe
@@ -55,7 +55,7 @@ jobs:
       - name: Build AppImage
         run: uv run bash scripts/build_appimage.sh
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
           path: dist/*.AppImage
@@ -84,16 +84,19 @@ jobs:
           PACKAGE_ROOT="$STAGING_ROOT/${PACKAGE_NAME}"
           INSTALL_ROOT="$PACKAGE_ROOT${PREFIX}"
           LIB_ROOT="$INSTALL_ROOT/lib/${PACKAGE_NAME}"
+          SRC_ROOT="$LIB_ROOT/src"
 
           rm -rf "$STAGING_ROOT"
-          mkdir -p "$PACKAGE_ROOT/DEBIAN" "$INSTALL_ROOT/bin" "$LIB_ROOT" dist
+          mkdir -p "$PACKAGE_ROOT/DEBIAN" "$INSTALL_ROOT/bin" "$SRC_ROOT" dist
 
-          cp -r src/udm "$LIB_ROOT/"
+          cp -r src/udm "$SRC_ROOT/"
           cp tools.json "$LIB_ROOT/tools.json"
+          find "$SRC_ROOT/udm" -type d -name "__pycache__" -prune -exec rm -rf {} +
+          find "$SRC_ROOT/udm" -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete
 
           cat >"$INSTALL_ROOT/bin/devinstaller" <<EOF
           #!/data/data/com.termux/files/usr/bin/sh
-          export PYTHONPATH="$PREFIX/lib/$PACKAGE_NAME\${PYTHONPATH:+:\$PYTHONPATH}"
+          export PYTHONPATH="$PREFIX/lib/$PACKAGE_NAME/src\${PYTHONPATH:+:\$PYTHONPATH}"
           exec $PREFIX/bin/python -m udm "\$@"
           EOF
           chmod 755 "$INSTALL_ROOT/bin/devinstaller"
@@ -116,7 +119,7 @@ jobs:
             "$PACKAGE_ROOT" \
             "dist/${PACKAGE_NAME}_${VERSION}_all.deb"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: termux-deb
           path: dist/*.deb
@@ -137,7 +140,7 @@ jobs:
       - name: Build DMG
         run: uv run bash scripts/build_dmg.sh
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
           path: dist/*.dmg
@@ -150,7 +153,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
