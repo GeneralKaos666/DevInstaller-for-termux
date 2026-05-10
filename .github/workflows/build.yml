@@ -139,6 +139,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG_NAME }}
+          target_commitish: ${{ github.sha }}
+          body: ${{ github.event.head_commit.message }}
           files: |
             artifacts/windows-exe/*
             artifacts/linux-appimage/*
