@@ -120,6 +120,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
@@ -135,14 +139,33 @@ jobs:
             echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           fi
 
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          git fetch --tags --quiet
+          CURRENT_TAG="${{ env.TAG_NAME }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude="$CURRENT_TAG" HEAD 2>/dev/null || echo "")
+          
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "### Changes in this release:" >> $GITHUB_ENV
+          if [ -z "$PREV_TAG" ]; then
+            git log --pretty=format:"- %s (%h)" >> $GITHUB_ENV
+          else
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> $GITHUB_ENV
+          fi
+          echo "" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG_NAME }}
           target_commitish: ${{ github.sha }}
-          body: ${{ github.event.head_commit.message }}
+          body: |
+            ${{ github.event.head_commit.message }}
+            
+            ${{ env.CHANGELOG }}
           files: |
             artifacts/windows-exe/*
             artifacts/linux-appimage/*
             artifacts/macos-dmg/*
-          generate_release_notes: true
