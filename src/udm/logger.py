@@ -15,9 +15,12 @@ import io
 
 _handlers = [logging.FileHandler(_log_file_path(), encoding="utf-8")]
 
-if sys.stdout is not None:
-    _stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    _handlers.append(logging.StreamHandler(_stream))
+try:
+    if sys.stdout is not None and hasattr(sys.stdout, "buffer") and sys.stdout.buffer is not None:
+        _stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        _handlers.append(logging.StreamHandler(_stream))
+except Exception:
+    pass  # No console available (windowed/frozen build)
 
 logging.basicConfig(
     level=logging.INFO,
