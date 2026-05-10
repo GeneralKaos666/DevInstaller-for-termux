@@ -13,15 +13,16 @@ def _log_file_path() -> Path:
 
 import io
 
-_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+_handlers = [logging.FileHandler(_log_file_path(), encoding="utf-8")]
+
+if sys.stdout is not None:
+    _stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    _handlers.append(logging.StreamHandler(_stream))
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(_log_file_path(), encoding="utf-8"),
-        logging.StreamHandler(_stream),
-    ],
+    handlers=_handlers,
 )
 
 logger = logging.getLogger("UniversalDevManager")
