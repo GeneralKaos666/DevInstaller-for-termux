@@ -77,9 +77,10 @@ jobs:
 
       - name: Install system dependencies
         run: |
+          # Fall back to Termux's standard app prefix when PREFIX is not exported.
           TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 
-          if command -v pkg >/dev/null 2>&1 && [ -d "$TERMUX_PREFIX" ]; then
+          if [ -n "${TERMUX_VERSION:-}" ] || { command -v pkg >/dev/null 2>&1 && [ -d "$TERMUX_PREFIX" ]; }; then
             pkg update
             pkg install -y x11-repo
             pkg install -y clang make pkg-config wget patchelf \
