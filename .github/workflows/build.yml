@@ -64,7 +64,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    # Set BUILD_LINUX_RUNNER to a JSON string such as
+    # BUILD_LINUX_RUNNER must be valid JSON. Set it to a JSON string such as
     # "ubuntu-latest" or ["self-hosted","Linux","termux"] to target
     # a Termux self-hosted runner without changing the default hosted path.
     runs-on: ${{ vars.BUILD_LINUX_RUNNER != '' && fromJSON(vars.BUILD_LINUX_RUNNER) || 'ubuntu-latest' }}
@@ -77,7 +77,9 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          if command -v pkg >/dev/null 2>&1 && [ -d "/data/data/com.termux/files/usr" ]; then
+          TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+
+          if command -v pkg >/dev/null 2>&1 && [ -d "$TERMUX_PREFIX" ]; then
             pkg update
             pkg install -y x11-repo
             pkg install -y clang make pkg-config wget patchelf \
