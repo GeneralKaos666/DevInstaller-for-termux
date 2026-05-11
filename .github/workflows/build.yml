@@ -64,9 +64,9 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    # BUILD_LINUX_RUNNER must be valid JSON. Set it to a JSON string such as
-    # "ubuntu-latest" or ["self-hosted","Linux","termux"] to target
-    # a Termux self-hosted runner without changing the default hosted path.
+    # Leave BUILD_LINUX_RUNNER unset to keep ubuntu-latest. If you set it,
+    # it must be valid JSON such as "ubuntu-latest" or
+    # ["self-hosted","Linux","termux"], otherwise the workflow will fail.
     runs-on: ${{ vars.BUILD_LINUX_RUNNER != '' && fromJSON(vars.BUILD_LINUX_RUNNER) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
@@ -80,7 +80,7 @@ jobs:
           # Fall back to Termux's standard app prefix when PREFIX is not exported.
           TERMUX_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 
-          if [ -n "${TERMUX_VERSION:-}" ] || { command -v pkg >/dev/null 2>&1 && [ -d "$TERMUX_PREFIX" ]; }; then
+          if [ -n "${TERMUX_VERSION:-}" ] || [ "${PREFIX:-}" = "$TERMUX_PREFIX" ]; then
             pkg update
             pkg install -y x11-repo
             pkg install -y clang make pkg-config wget patchelf \
