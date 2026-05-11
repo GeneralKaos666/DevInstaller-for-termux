@@ -64,7 +64,10 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    runs-on: ubuntu-latest
+    # Set BUILD_LINUX_RUNNER to a JSON string such as
+    # "ubuntu-latest" or ["self-hosted","Linux","termux"] to target
+    # a Termux self-hosted runner without changing the default hosted path.
+    runs-on: ${{ vars.BUILD_LINUX_RUNNER != '' && fromJSON(vars.BUILD_LINUX_RUNNER) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
 
