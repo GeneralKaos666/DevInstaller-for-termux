@@ -64,8 +64,8 @@ jobs:
           if-no-files-found: error
 
   build-linux:
-    # Leave BUILD_LINUX_RUNNER unset to keep ubuntu-latest. If you set it,
-    # it must be valid JSON such as "ubuntu-latest" or
+    # Leave the repository/org variable vars.BUILD_LINUX_RUNNER unset to keep
+    # ubuntu-latest. If you set it, it must be valid JSON such as
     # ["self-hosted","linux","termux"], otherwise the workflow will fail.
     runs-on: ${{ vars.BUILD_LINUX_RUNNER && fromJSON(vars.BUILD_LINUX_RUNNER) || 'ubuntu-latest' }}
     steps:
@@ -77,6 +77,7 @@ jobs:
 
       - name: Install system dependencies
         run: |
+          # TERMUX_VERSION is exported by Termux and enables the pkg-based path.
           if [ -n "${TERMUX_VERSION:-}" ]; then
             pkg update
             pkg install -y x11-repo
