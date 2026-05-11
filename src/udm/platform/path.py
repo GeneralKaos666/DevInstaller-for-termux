@@ -5,7 +5,29 @@ import os
 from pathlib import Path
 
 from udm.logger import logger
-from udm.platform.detect import is_linux, is_mac, is_windows
+from udm.platform.detect import is_linux, is_mac, is_termux, is_windows, termux_prefix
+
+
+def _normalize_platform_path(path: str) -> str:
+    """Translate platform-specific defaults to the active runtime layout."""
+    normalized = os.path.normpath(path)
+    if is_termux() and (
+        normalized == "/bin"
+        or normalized == "/usr/bin"
+        or normalized == "/usr/local/bin"
+        or normalized.startswith("/usr/")
+    ):
+        return os.path.join(termux_prefix(), "bin")
+    return normalized
+
+
+def _path_contains(directory: str) -> bool:
+    entries = [
+        os.path.normpath(entry)
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry.strip()
+    ]
+    return directory in entries
 
 
 def resolve_env_path(p: str) -> str:
@@ -15,8 +37,8 @@ def resolve_env_path(p: str) -> str:
     if "*" in expanded:
         matches = glob.glob(expanded)
         if matches:
-            return os.path.normpath(sorted(matches)[-1])
-    return os.path.normpath(expanded)
+            return _normalize_platform_path(sorted(matches)[-1])
+    return _normalize_platform_path(expanded)
 
 
 def _windows_get_user_path() -> str:
@@ -66,6 +88,10 @@ def _windows_set_user_path(new_path: str) -> bool:
 def add_to_path(directory: str) -> bool:
     """Add *directory* to the user PATH if it is not already present."""
     directory = resolve_env_path(directory)
+
+    if _path_contains(directory):
+        logger.info(f"PATH already contains {directory}")
+        return True
 
     if is_windows():
         current = _windows_get_user_path()

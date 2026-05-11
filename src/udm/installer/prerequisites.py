@@ -1,7 +1,7 @@
-"""Platform prerequisites — Homebrew and apt-get update."""
+"""Platform prerequisites — Homebrew, apt, and pkg index setup."""
 
 from udm.installer.callbacks import log
-from udm.platform import command_exists, is_linux, is_mac, run_command
+from udm.platform import command_exists, is_linux, is_mac, is_termux, run_command
 
 
 def ensure_homebrew():
@@ -17,8 +17,13 @@ def ensure_homebrew():
 
 
 def ensure_apt_updated():
-    """Run `sudo apt-get update` once per session on Linux."""
+    """Refresh the active Linux package index once per session."""
     if not hasattr(ensure_apt_updated, "_done"):
-        log("  Updating apt package index…")
-        run_command("sudo apt-get update -y", timeout=120)
+        if is_linux() and is_termux():
+            update_cmd = "pkg update -y" if command_exists("pkg") else "apt update -y"
+            log("  Updating Termux package index…")
+        else:
+            update_cmd = "sudo apt-get update -y"
+            log("  Updating apt package index…")
+        run_command(update_cmd, timeout=120)
         ensure_apt_updated._done = True

@@ -8,10 +8,90 @@ from udm.platform import (
     add_to_path,
     is_linux,
     is_mac,
+    is_termux,
     is_windows,
     resolve_env_path,
     run_command,
 )
+
+TERMUX_PACKAGE_ALIASES = {
+    "python3": "python",
+    "python3-pip": "python-pip",
+    "python3-venv": "",
+    "python3.11": "python",
+    "python3.11-venv": "",
+    "ninja-build": "ninja",
+    "golang-go": "golang",
+    "openjdk-17-jdk": "openjdk-17",
+    "openjdk-21-jdk": "openjdk-21",
+    "php-cli": "",
+    "php-mbstring": "",
+    "ruby-full": "ruby",
+    "p7zip-full": "p7zip",
+    "fd-find": "fd",
+    "protobuf-compiler": "protobuf",
+    "mysql-server": "mariadb",
+    "postgresql-client": "",
+    "redis-server": "redis",
+}
+
+TERMUX_DETECT_OVERRIDES = {
+    "python311": "python --version",
+}
+
+APT_INSTALL_PREFIXES = (
+    "sudo apt-get install -y ",
+    "apt-get install -y ",
+    "sudo apt install -y ",
+    "apt install -y ",
+)
+
+
+def _map_termux_packages(packages: list[str]) -> list[str]:
+    """Translate Debian package names to their Termux equivalents."""
+    mapped_packages: list[str] = []
+    for package in packages:
+        mapped = TERMUX_PACKAGE_ALIASES.get(package, package)
+        if not mapped or mapped in mapped_packages:
+            continue
+        mapped_packages.append(mapped)
+    return mapped_packages
+
+
+def _rewrite_termux_install_cmd(cmd: str) -> str:
+    """Rewrite Debian-style install commands to their Termux form."""
+    for prefix in APT_INSTALL_PREFIXES:
+        if cmd.startswith(prefix):
+            packages = cmd[len(prefix) :].split()
+            mapped_packages = _map_termux_packages(packages)
+            if not mapped_packages:
+                return ""
+            return f"pkg install -y {' '.join(mapped_packages)}"
+    return cmd
+
+
+def _detect_commands(tool: dict) -> list[str]:
+    """Return detection commands in preferred order for the active platform."""
+    commands: list[str] = []
+
+    if is_termux():
+        override = tool.get("detect_cmd_termux", "")
+        if override:
+            commands.append(override)
+
+        alias = TERMUX_DETECT_OVERRIDES.get(tool.get("key", ""))
+        if alias:
+            commands.append(alias)
+
+    detect_cmd = tool.get("detect_cmd", "")
+    if detect_cmd:
+        commands.append(detect_cmd)
+
+    alt = tool.get("detect_cmd_alt", "")
+    if alt:
+        commands.append(alt)
+
+    return commands
 
 
 def _get_install_cmd(tool: dict) -> str:
@@ -22,7 +102,13 @@ def _get_install_cmd(tool: dict) -> str:
         if cmd.startswith("winget") and "--disable-interactivity" not in cmd:
             cmd += " --disable-interactivity"
     elif is_linux():
+        if is_termux():
+            cmd = tool.get("install_command_termux", "")
+            if cmd:
+                return cmd
         cmd = tool.get("install_command_linux", "")
+        if is_termux():
+            cmd = _rewrite_termux_install_cmd(cmd)
     elif is_mac():
         cmd = tool.get("install_command_mac", "")
     return cmd
@@ -30,16 +116,9 @@ def _get_install_cmd(tool: dict) -> str:
 
 def detect_tool(tool: dict) -> bool:
     """Return True if the tool is already present on the system."""
-    detect_cmd = tool.get("detect_cmd", "")
-    if not detect_cmd:
-        return False
-    rc, out, _ = run_command(detect_cmd, timeout=15)
-    if rc == 0:
-        return True
-    alt = tool.get("detect_cmd_alt", "")
-    if alt:
-        rc2, _, _ = run_command(alt, timeout=15)
-        if rc2 == 0:
+    for command in _detect_commands(tool):
+        rc, _, _ = run_command(command, timeout=15)
+        if rc == 0:
             return True
     return False
 
@@ -55,7 +134,12 @@ def install_tool(tool: dict) -> bool:
 
     if is_mac():
         ensure_homebrew()
-    if is_linux() and cmd.startswith("sudo apt"):
+    if is_linux() and (
+        cmd.startswith("sudo apt")
+        or cmd.startswith("apt ")
+        or cmd.startswith("apt-get ")
+        or cmd.startswith("pkg ")
+    ):
         ensure_apt_updated()
 
     log(f"  Running: {cmd}")
@@ -86,14 +170,15 @@ def setup_path(tool: dict) -> bool:
     if not tool.get("path_required", False):
         return True
 
-    key = (
-        "path_dirs_windows"
-        if is_windows()
-        else "path_dirs_linux"
-        if is_linux()
-        else "path_dirs_mac"
-    )
-    dirs = tool.get(key, [])
+    if is_windows():
+        dirs = tool.get("path_dirs_windows", [])
+    elif is_termux():
+        dirs = tool.get("path_dirs_termux") or tool.get("path_dirs_linux", [])
+    elif is_linux():
+        dirs = tool.get("path_dirs_linux", [])
+    else:
+        dirs = tool.get("path_dirs_mac", [])
+
     if not dirs:
         return True
 
