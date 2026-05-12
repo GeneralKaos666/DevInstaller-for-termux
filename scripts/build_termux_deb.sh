@@ -30,7 +30,7 @@ if not match:
 print(match.group(1))
 PY
 )"
-ARCH="$(dpkg --print-architecture)"
+ARCH="${TERMUX_DEB_ARCH:-all}"
 PACKAGE="devinstaller"
 OUTPUT="$DIST/${PACKAGE}_${VERSION}_${ARCH}.deb"
 
