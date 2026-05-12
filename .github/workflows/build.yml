@@ -152,6 +152,9 @@ jobs:
             TAG_NAME="v${BASH_REMATCH[1]}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            echo "Unable to determine release tag name" >&2
+            exit 1
           fi
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
