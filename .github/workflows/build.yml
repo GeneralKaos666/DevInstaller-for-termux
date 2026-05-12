@@ -133,6 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag_name: ${{ steps.determine_tag.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -147,11 +149,12 @@ jobs:
         run: |
           MSG="${{ github.event.head_commit.message }}"
           if [[ "$MSG" =~ ^release:[[:space:]]*([0-9\.]+[A-Za-z0-9\-]*) ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            echo "TAG_NAME=v$VERSION" >> $GITHUB_ENV
+            TAG_NAME="v${BASH_REMATCH[1]}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
           fi
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Generate Changelog
         id: changelog
@@ -196,19 +199,9 @@ jobs:
           name: termux-deb
           path: artifacts/termux-deb
 
-      - name: Determine Tag Name
-        run: |
-          MSG="${{ github.event.head_commit.message }}"
-          if [[ "$MSG" =~ ^release:[[:space:]]*([0-9\.]+[A-Za-z0-9\-]*) ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            echo "TAG_NAME=v$VERSION" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          fi
-
       - name: Upload Termux package to Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ needs.release.outputs.tag_name }}
           files: |
             artifacts/termux-deb/*
